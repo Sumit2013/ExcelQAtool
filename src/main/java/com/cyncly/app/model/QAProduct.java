@@ -8,13 +8,30 @@ public class QAProduct {
     private String subtype;
     private String description;
     private List<Checkpoint> checkpoints;
+    private int rowIndex;
+    private String bugIdAndDescription;
 
     public QAProduct(String sku, String type, String subtype, String description) {
         this.sku = sku;
         this.type = type;
         this.subtype = subtype;
         this.description = description;
+    }
 
+    public String getBugIdAndDescription() {
+        return bugIdAndDescription;
+    }
+
+    public void setBugIdAndDescription(String bugIdAndDescription) {
+        this.bugIdAndDescription = bugIdAndDescription;
+    }
+
+    public int getRowIndex() {
+        return rowIndex;
+    }
+
+    public void setRowIndex(int rowIndex) {
+        this.rowIndex = rowIndex;
     }
 
     public void setCheckpoints(List<Checkpoint> checkpoints) {
