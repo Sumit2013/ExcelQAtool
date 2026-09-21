@@ -1,28 +1,15 @@
 package com.cyncly.app.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Cursor;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.UIManager;
+import javax.swing.*;
+import javax.swing.border.AbstractBorder;
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 
 import com.cyncly.app.model.Checkpoint;
 import com.cyncly.app.model.QAProduct;
@@ -51,18 +38,20 @@ public class QAWindow {
 
     private final List<CheckpointUI> checkpointUIList = new ArrayList<>();
 
+    // ── simple DTO ───────────────────────────────────────────────────────────
     private static class CheckpointUI {
         Checkpoint checkpoint;
         JComboBox<String> dropdown;
         JTextField commentField;
 
-        CheckpointUI(Checkpoint checkpoint, JComboBox<String> dropdown, JTextField commentField) {
-            this.checkpoint = checkpoint;
-            this.dropdown = dropdown;
-            this.commentField = commentField;
+        CheckpointUI(Checkpoint c, JComboBox<String> d, JTextField t) {
+            this.checkpoint = c;
+            this.dropdown = d;
+            this.commentField = t;
         }
     }
 
+    // ── constructors ─────────────────────────────────────────────────────────
     public QAWindow(QAProduct product) {
         this(new QAservice(), product);
     }
@@ -72,244 +61,290 @@ public class QAWindow {
         this.currentProduct = initialProduct;
     }
 
+    // ── public entry point ───────────────────────────────────────────────────
     public void show() {
+        // Use cross-platform L&F so our custom colours are not overridden
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {}
+            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+        } catch (Exception ignored) {
+        }
 
-        frame = new JFrame("Excel QA Tool - Product Validation");
-        frame.setSize(900, 680);
-        frame.setMinimumSize(new Dimension(750, 500));
+        // Scope dark overrides to combo/list/textfield only.
+        // Do NOT override Panel.background globally — it bleeds into JOptionPane.
+        UIManager.put("ComboBox.background", Theme.FIELD_BG);
+        UIManager.put("ComboBox.foreground", Theme.TEXT_PRIMARY);
+        UIManager.put("ComboBox.selectionBackground", Theme.ACCENT_DIM);
+        UIManager.put("ComboBox.selectionForeground", Color.WHITE);
+        UIManager.put("ComboBox.buttonBackground", Theme.FIELD_BG);
+        UIManager.put("ComboBox.disabledBackground", Theme.FIELD_BG);
+        UIManager.put("ComboBox.disabledForeground", Theme.TEXT_MUTED);
+        UIManager.put("List.background", Theme.FIELD_BG);
+        UIManager.put("List.foreground", Theme.TEXT_PRIMARY);
+        UIManager.put("List.selectionBackground", Theme.ACCENT_DIM);
+        UIManager.put("List.selectionForeground", Color.WHITE);
+        UIManager.put("TextField.background", Theme.FIELD_BG);
+        UIManager.put("TextField.foreground", Theme.TEXT_PRIMARY);
+        UIManager.put("TextField.caretForeground", Theme.ACCENT);
+        UIManager.put("TextField.selectionBackground", Theme.ACCENT_DIM);
+        UIManager.put("TextField.selectionForeground", Color.WHITE);
+        UIManager.put("TextField.inactiveForeground", Theme.TEXT_MUTED);
+
+        // Keep JOptionPane / system dialogs light and fully readable
+        Color dialogBg = new Color(245, 246, 250);
+        Color dialogFg = new Color(25, 25, 35);
+        UIManager.put("OptionPane.background", dialogBg);
+        UIManager.put("OptionPane.messageForeground", dialogFg);
+        UIManager.put("OptionPane.messageFont", Theme.plain(13));
+        UIManager.put("OptionPane.buttonFont", Theme.bold(12));
+        UIManager.put("Panel.background", dialogBg); // keeps dialog panels light
+        UIManager.put("Label.foreground", dialogFg); // dialog message text
+
+        frame = new JFrame("Excel QA Tool – Product Validation");
+        frame.setSize(980, 720);
+        frame.setMinimumSize(new Dimension(780, 540));
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         frame.setLocationRelativeTo(null);
-
-        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+        frame.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
+            public void windowClosing(WindowEvent e) {
                 handleWindowClosing();
             }
         });
 
-        // Main layout
-        JPanel mainContainer = new JPanel(new BorderLayout(10, 10));
-        mainContainer.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        // Root background
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setBackground(Theme.BG_DARK);
+        root.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
-        // North: Product Information Header Card
-        JPanel headerCard = createHeaderPanel();
-        mainContainer.add(headerCard, BorderLayout.NORTH);
+        // ── Title bar strip ───────────────────────────────────────────────
+        root.add(createTitleBar(), BorderLayout.NORTH);
 
-        // Center: Scrollable Checkpoints Panel
-        checkpointPanel = new JPanel();
-        checkpointPanel.setLayout(new BoxLayout(checkpointPanel, BoxLayout.Y_AXIS));
-        checkpointPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        // ── Center: header card + checkpoints ────────────────────────────
+        JPanel centerCol = new JPanel(new BorderLayout(0, 10));
+        centerCol.setOpaque(false);
+        centerCol.add(createHeaderCard(), BorderLayout.NORTH);
+        centerCol.add(createCheckpointsArea(), BorderLayout.CENTER);
+        root.add(centerCol, BorderLayout.CENTER);
 
-        JScrollPane scrollPane = new JScrollPane(checkpointPanel);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Quality Checkpoints"));
-        mainContainer.add(scrollPane, BorderLayout.CENTER);
+        // ── South: bug field + buttons ────────────────────────────────────
+        root.add(createBottomPanel(), BorderLayout.SOUTH);
 
-        // South: Control & Action Buttons Panel
-        JPanel southPanel = createBottomControlPanel();
-        mainContainer.add(southPanel, BorderLayout.SOUTH);
+        frame.setContentPane(root);
 
-        frame.setContentPane(mainContainer);
-
-        // Load the initial product data
         if (currentProduct != null) {
             displayProduct(currentProduct);
         }
-
         frame.setVisible(true);
     }
 
-    private JPanel createHeaderPanel() {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+    // ── Title bar ─────────────────────────────────────────────────────────────
+    private JPanel createTitleBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setOpaque(false);
+        bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
+
+        JLabel title = new JLabel("Excel QA Tool");
+        title.setFont(Theme.bold(20));
+        title.setForeground(Theme.TEXT_PRIMARY);
+
+        JLabel subtitle = new JLabel("Product Validation");
+        subtitle.setFont(Theme.plain(13));
+        subtitle.setForeground(Theme.TEXT_MUTED);
+
+        JPanel left = new JPanel();
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.setOpaque(false);
+        left.add(title);
+        left.add(subtitle);
+        bar.add(left, BorderLayout.WEST);
+
+        // Thin accent separator at the bottom
+        bar.add(createSeparator(), BorderLayout.SOUTH);
+        return bar;
+    }
+
+    // ── Product header card ───────────────────────────────────────────────────
+    private JPanel createHeaderCard() {
+        JPanel card = new JPanel(new GridLayout(2, 2, 14, 6));
+        card.setBackground(Theme.CARD_BG);
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Product Details"),
-                BorderFactory.createEmptyBorder(6, 10, 8, 10)
-        ));
+                new RoundLineBorder(Theme.BORDER, 1, 10),
+                BorderFactory.createEmptyBorder(12, 16, 12, 16)));
 
-        skuLabel = new JLabel("SKU: -");
-        skuLabel.setFont(skuLabel.getFont().deriveFont(Font.BOLD, 14f));
+        skuLabel = styledLabel("SKU: —", Theme.TEXT_PRIMARY, 14, true);
+        rowInfoLabel = styledLabel("Excel Row: —", Theme.TEXT_MUTED, 12, false);
+        typeLabel = styledLabel("Type: —", Theme.TEXT_PRIMARY, 12, false);
+        subtypeLabel = styledLabel("Subtype: —", Theme.TEXT_PRIMARY, 12, false);
+        descriptionLabel = styledLabel("Description: —", Theme.TEXT_MUTED, 12, false);
 
-        typeLabel = new JLabel("Type: -");
-        subtypeLabel = new JLabel("Subtype: -");
-        descriptionLabel = new JLabel("Description: -");
-        rowInfoLabel = new JLabel("Excel Row: -");
-        rowInfoLabel.setForeground(new Color(90, 90, 90));
-
+        // Row 1: SKU (left) | Excel row (right)
         JPanel row1 = new JPanel(new BorderLayout());
+        row1.setOpaque(false);
         row1.add(skuLabel, BorderLayout.WEST);
         row1.add(rowInfoLabel, BorderLayout.EAST);
 
-        JPanel row2 = new JPanel(new GridLayout(1, 2, 10, 5));
+        // Row 2: type | subtype
+        JPanel row2 = new JPanel(new GridLayout(1, 2, 10, 0));
+        row2.setOpaque(false);
         row2.add(typeLabel);
         row2.add(subtypeLabel);
 
         card.add(row1);
-        card.add(Box.createVerticalStrut(4));
+        card.add(new JLabel()); // spacer
         card.add(row2);
-        card.add(Box.createVerticalStrut(4));
         card.add(descriptionLabel);
 
         return card;
     }
 
-    private JPanel createBottomControlPanel() {
-        JPanel southPanel = new JPanel();
-        southPanel.setLayout(new BoxLayout(southPanel, BoxLayout.Y_AXIS));
-        southPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+    // ── Checkpoints scroll area ───────────────────────────────────────────────
+    private JScrollPane createCheckpointsArea() {
+        checkpointPanel = new JPanel();
+        checkpointPanel.setLayout(new BoxLayout(checkpointPanel, BoxLayout.Y_AXIS));
+        checkpointPanel.setBackground(Theme.BG_DARK);
+        checkpointPanel.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
 
-        // Bug Tracking Panel
-        JPanel bugPanel = new JPanel(new BorderLayout(10, 0));
-        bugPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Defect Tracking"),
-                BorderFactory.createEmptyBorder(4, 8, 6, 8)
-        ));
-        JLabel bugLabel = new JLabel("Bug ID & Description:");
-        bugLabel.setFont(bugLabel.getFont().deriveFont(Font.BOLD, 12f));
-        bugIdField = new JTextField();
-        bugIdField.setPreferredSize(new Dimension(300, 28));
-        bugPanel.add(bugLabel, BorderLayout.WEST);
-        bugPanel.add(bugIdField, BorderLayout.CENTER);
+        JScrollPane scroll = new JScrollPane(checkpointPanel);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.setBorder(BorderFactory.createCompoundBorder(
+                new RoundLineBorder(Theme.BORDER, 1, 10),
+                BorderFactory.createEmptyBorder(0, 0, 0, 0)));
+        scroll.setBackground(Theme.BG_DARK);
+        scroll.getViewport().setBackground(Theme.BG_DARK);
 
-        // Action Buttons & Status Row
-        JPanel actionRow = new JPanel(new BorderLayout(10, 0));
-        actionRow.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
+        // Style the scrollbar
+        scroll.getVerticalScrollBar().setUI(new DarkScrollBarUI());
+        scroll.getVerticalScrollBar().setBackground(Theme.BG_DARK);
+        scroll.getHorizontalScrollBar().setUI(new DarkScrollBarUI());
 
-        statusLabel = new JLabel("Ready");
-        statusLabel.setForeground(new Color(60, 60, 60));
+        // Section label above
+        JPanel wrapper = new JPanel(new BorderLayout(0, 6));
+        wrapper.setOpaque(false);
 
-        buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JLabel sectionLabel = styledLabel("Quality Checkpoints", Theme.ACCENT, 13, true);
+        wrapper.add(sectionLabel, BorderLayout.NORTH);
+        wrapper.add(scroll, BorderLayout.CENTER);
 
-        doneButton = new JButton("Done");
-        doneButton.setFont(doneButton.getFont().deriveFont(Font.BOLD, 13f));
-        doneButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        doneButton.setPreferredSize(new Dimension(110, 34));
-        doneButton.addActionListener(e -> onDoneClicked());
+        // We need to return the scroll, but we want the wrapper in CENTER.
+        // So we put it in a wrapper panel that is returned
+        JPanel outer = new JPanel(new BorderLayout(0, 6));
+        outer.setOpaque(false);
+        outer.add(sectionLabel, BorderLayout.NORTH);
+        outer.add(scroll, BorderLayout.CENTER);
 
-        nextButton = new JButton("Next >>");
-        nextButton.setFont(nextButton.getFont().deriveFont(Font.BOLD, 13f));
-        nextButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        nextButton.setPreferredSize(new Dimension(110, 34));
-        nextButton.setVisible(false); // Hidden until "Done" is clicked
-        nextButton.addActionListener(e -> onNextClicked());
+        // Save scroll as the component we return
+        checkpointPanel.putClientProperty("scroll", scroll);
+        return scroll;
+    }
 
-        saveAndExitButton = new JButton("Save & Exit");
-        saveAndExitButton.setFont(saveAndExitButton.getFont().deriveFont(Font.BOLD, 13f));
-        saveAndExitButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        saveAndExitButton.setPreferredSize(new Dimension(120, 34));
+    // ── Bottom panel: bug field + buttons ────────────────────────────────────
+    private JPanel createBottomPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+
+        panel.add(createSeparator());
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(createBugRow());
+        panel.add(Box.createVerticalStrut(8));
+        panel.add(createActionRow());
+
+        return panel;
+    }
+
+    private JPanel createBugRow() {
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.setOpaque(false);
+
+        JLabel label = styledLabel("Bug ID & Description:", Theme.TEXT_PRIMARY, 12, true);
+        label.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 8));
+
+        bugIdField = styledTextField();
+
+        row.add(label, BorderLayout.WEST);
+        row.add(bugIdField, BorderLayout.CENTER);
+        return row;
+    }
+
+    private JPanel createActionRow() {
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setOpaque(false);
+
+        statusLabel = styledLabel("Ready", Theme.TEXT_MUTED, 12, false);
+        row.add(statusLabel, BorderLayout.WEST);
+
+        buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        buttonPanel.setOpaque(false);
+
+        saveAndExitButton = ghostButton("Save & Exit", Theme.BTN_GHOST, Theme.BTN_GHOST_HV);
         saveAndExitButton.addActionListener(e -> onSaveAndExitClicked());
 
-        backButton = new JButton("<< Back");
-        backButton.setFont(backButton.getFont().deriveFont(Font.BOLD, 13f));
-        backButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        backButton.setPreferredSize(new Dimension(100, 34));
+        backButton = ghostButton("<< Back", Theme.BTN_GHOST, Theme.BTN_GHOST_HV);
         backButton.addActionListener(e -> onBackClicked());
+
+        doneButton = accentButton("Done", Theme.ACCENT, Theme.ACCENT_HOVER);
+        doneButton.addActionListener(e -> onDoneClicked());
+
+        nextButton = accentButton("Next >>", Theme.ACCENT_DIM, Theme.ACCENT);
+        nextButton.setVisible(false);
+        nextButton.addActionListener(e -> onNextClicked());
 
         buttonPanel.add(saveAndExitButton);
         buttonPanel.add(backButton);
         buttonPanel.add(doneButton);
         buttonPanel.add(nextButton);
 
-        actionRow.add(statusLabel, BorderLayout.WEST);
-        actionRow.add(buttonPanel, BorderLayout.EAST);
-
-        southPanel.add(bugPanel);
-        southPanel.add(Box.createVerticalStrut(4));
-        southPanel.add(actionRow);
-
-        return southPanel;
+        row.add(buttonPanel, BorderLayout.EAST);
+        return row;
     }
 
+    // ── displayProduct ────────────────────────────────────────────────────────
     public void displayProduct(QAProduct product) {
         this.currentProduct = product;
         checkpointUIList.clear();
 
-        // Update Header Labels
-        skuLabel.setText("SKU: " + (product.getSku() != null ? product.getSku() : "N/A"));
-        typeLabel.setText("Type: " + (product.getType() != null ? product.getType() : "-"));
-        subtypeLabel.setText("Subtype: " + (product.getSubtype() != null ? product.getSubtype() : "-"));
-        descriptionLabel.setText("Description: " + (product.getDescription() != null ? product.getDescription() : "-"));
-        rowInfoLabel.setText("Excel Row: " + (product.getRowIndex() + 1));
+        skuLabel.setText("SKU: " + nvl(product.getSku(), "N/A"));
+        typeLabel.setText("Type: " + nvl(product.getType(), "—"));
+        subtypeLabel.setText("Subtype: " + nvl(product.getSubtype(), "—"));
+        descriptionLabel.setText("Description: " + nvl(product.getDescription(), "—"));
+        rowInfoLabel.setText("Row " + (product.getRowIndex() + 1));
 
-        // Rebuild Checkpoint List
         checkpointPanel.removeAll();
 
-        // Table Header
-        JPanel headerRow = new JPanel(new GridLayout(1, 3, 10, 5));
-        headerRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
-        JLabel col1 = new JLabel("Checkpoint");
-        col1.setFont(col1.getFont().deriveFont(Font.BOLD));
-        JLabel col2 = new JLabel("Value / Status");
-        col2.setFont(col2.getFont().deriveFont(Font.BOLD));
-        JLabel col3 = new JLabel("Comment / Remarks");
-        col3.setFont(col3.getFont().deriveFont(Font.BOLD));
-        headerRow.add(col1);
-        headerRow.add(col2);
-        headerRow.add(col3);
-        headerRow.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
+        // ── Column header row ─────────────────────────────────────────────
+        JPanel headerRow = new JPanel(new GridLayout(1, 3, 10, 0));
+        headerRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        headerRow.setBackground(Theme.CARD_BG);
+        headerRow.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER),
+                BorderFactory.createEmptyBorder(4, 8, 6, 8)));
 
+        headerRow.add(colHeader("Checkpoint"));
+        headerRow.add(colHeader("Value / Status"));
+        headerRow.add(colHeader("Comment / Remarks"));
         checkpointPanel.add(headerRow);
-        checkpointPanel.add(Box.createVerticalStrut(6));
+        checkpointPanel.add(Box.createVerticalStrut(4));
 
+        // ── Checkpoint rows ───────────────────────────────────────────────
         if (product.getCheckpoints() != null) {
-            for (Checkpoint checkpoint : product.getCheckpoints()) {
-                JPanel row = new JPanel(new GridLayout(1, 3, 10, 5));
-                row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-
-                JLabel nameLabel = new JLabel(checkpoint.getName());
-                nameLabel.setToolTipText(checkpoint.getName());
-
-                String[] options = checkpoint.getValues() != null
-                        ? checkpoint.getValues().toArray(new String[0])
-                        : new String[]{"Ok", "Need to confirm", "NA"};
-
-                JComboBox<String> dropdown = new JComboBox<>(options);
-                dropdown.setMaximumRowCount(14);
-                if (checkpoint.getSelectedValue() != null && !checkpoint.getSelectedValue().isEmpty()) {
-                    String currentVal = checkpoint.getSelectedValue().trim();
-                    boolean found = false;
-                    for (int idx = 0; idx < dropdown.getItemCount(); idx++) {
-                        if (dropdown.getItemAt(idx).equalsIgnoreCase(currentVal)) {
-                            dropdown.setSelectedIndex(idx);
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        dropdown.addItem(currentVal);
-                        dropdown.setSelectedItem(currentVal);
-                    }
-                }
-
-                JTextField commentField = new JTextField();
-                if (checkpoint.getComment() != null) {
-                    commentField.setText(checkpoint.getComment());
-                }
-
-                row.add(nameLabel);
-                row.add(dropdown);
-                row.add(commentField);
-
-                checkpointUIList.add(new CheckpointUI(checkpoint, dropdown, commentField));
+            int idx = 0;
+            for (Checkpoint cp : product.getCheckpoints()) {
+                JPanel row = buildCheckpointRow(cp, idx % 2 == 0);
                 checkpointPanel.add(row);
-                checkpointPanel.add(Box.createVerticalStrut(4));
+                checkpointPanel.add(Box.createVerticalStrut(2));
+                idx++;
             }
         }
 
-        // Populate Bug ID & Description
         if (bugIdField != null) {
-            bugIdField.setText(product.getBugIdAndDescription() != null ? product.getBugIdAndDescription() : "");
+            bugIdField.setText(nvl(product.getBugIdAndDescription(), ""));
         }
 
-        // Hide Next button until "Done" is clicked for this new row
         nextButton.setVisible(false);
-        if (backButton != null) {
+        if (backButton != null)
             backButton.setEnabled(service.hasPreviousProduct());
-        }
-        statusLabel.setText("Viewing SKU: " + product.getSku());
+        setStatus("Viewing SKU: " + product.getSku(), Theme.TEXT_MUTED);
 
         checkpointPanel.revalidate();
         checkpointPanel.repaint();
@@ -319,62 +354,94 @@ public class QAWindow {
         }
     }
 
+    private JPanel buildCheckpointRow(Checkpoint cp, boolean isEven) {
+        JPanel row = new JPanel(new GridLayout(1, 3, 10, 0));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        row.setBackground(isEven ? Theme.CARD_BG : Theme.ROW_ALT);
+        row.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+
+        JLabel nameLabel = new JLabel(cp.getName());
+        nameLabel.setFont(Theme.plain(12));
+        nameLabel.setForeground(Theme.TEXT_PRIMARY);
+        nameLabel.setToolTipText(cp.getName());
+
+        String[] options = cp.getValues() != null
+                ? cp.getValues().toArray(new String[0])
+                : new String[] { "Ok", "Need to confirm", "NA" };
+
+        JComboBox<String> dropdown = styledCombo(options);
+        if (cp.getSelectedValue() != null && !cp.getSelectedValue().isEmpty()) {
+            String val = cp.getSelectedValue().trim();
+            boolean found = false;
+            for (int i = 0; i < dropdown.getItemCount(); i++) {
+                if (dropdown.getItemAt(i).equalsIgnoreCase(val)) {
+                    dropdown.setSelectedIndex(i);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                dropdown.addItem(val);
+                dropdown.setSelectedItem(val);
+            }
+        }
+
+        JTextField commentField = styledTextField();
+        if (cp.getComment() != null)
+            commentField.setText(cp.getComment());
+
+        row.add(nameLabel);
+        row.add(dropdown);
+        row.add(commentField);
+
+        checkpointUIList.add(new CheckpointUI(cp, dropdown, commentField));
+        return row;
+    }
+
+    // ── Button actions ────────────────────────────────────────────────────────
     private void onDoneClicked() {
         if (currentProduct == null) {
-            JOptionPane.showMessageDialog(frame, "No product is currently loaded.", "Warning", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(frame, "No product is currently loaded.", "Warning",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        // 1. Gather all updated values from the UI
         for (CheckpointUI item : checkpointUIList) {
-            String selectedVal = (String) item.dropdown.getSelectedItem();
-            String comment = item.commentField.getText();
-            item.checkpoint.setSelectedValue(selectedVal);
-            item.checkpoint.setComment(comment);
+            item.checkpoint.setSelectedValue((String) item.dropdown.getSelectedItem());
+            item.checkpoint.setComment(item.commentField.getText());
         }
-
-        if (bugIdField != null) {
+        if (bugIdField != null)
             currentProduct.setBugIdAndDescription(bugIdField.getText().trim());
-        }
 
-        // 2. Save back to Excel
         try {
             service.saveCurrentProduct(currentProduct);
-
-            statusLabel.setText("Saved successfully to sheet for SKU: " + currentProduct.getSku() + " (Row " + (currentProduct.getRowIndex() + 1) + ")");
+            setStatus("✓ Saved – SKU: " + currentProduct.getSku()
+                    + "  (Row " + (currentProduct.getRowIndex() + 1) + ")", Theme.TEXT_SUCCESS);
             JOptionPane.showMessageDialog(frame,
-                    "Data for SKU '" + currentProduct.getSku() + "' has been successfully updated and saved to Excel!",
-                    "Saved Successfully",
-                    JOptionPane.INFORMATION_MESSAGE);
-
-            // 3. Reveal the "Next" button on UI
+                    "Data for SKU '" + currentProduct.getSku() + "' saved to Excel successfully!",
+                    "Saved", JOptionPane.INFORMATION_MESSAGE);
             nextButton.setVisible(true);
             buttonPanel.revalidate();
             buttonPanel.repaint();
-
         } catch (IOException ex) {
             ex.printStackTrace();
+            setStatus("Save failed: " + ex.getMessage(), Theme.TEXT_ERROR);
             JOptionPane.showMessageDialog(frame,
-                    "Error saving to Excel file:\n" + ex.getMessage() +
-                    "\n\nIf the Excel file is currently open in Microsoft Excel, please close it and click 'Done' again.",
-                    "Save Failed",
-                    JOptionPane.ERROR_MESSAGE);
-            statusLabel.setText("Save failed: " + ex.getMessage());
+                    "Error saving to Excel file:\n" + ex.getMessage()
+                            + "\n\nIf the file is open in Excel, please close it and try again.",
+                    "Save Failed", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void onNextClicked() {
-        statusLabel.setText("Loading next SKU...");
-
-        QAProduct nextProduct = service.loadNextProduct();
-        if (nextProduct != null) {
-            displayProduct(nextProduct);
+        setStatus("Loading next SKU…", Theme.TEXT_MUTED);
+        QAProduct next = service.loadNextProduct();
+        if (next != null) {
+            displayProduct(next);
         } else {
             JOptionPane.showMessageDialog(frame,
-                    "No more SKU rows found in the sheet. You have reached the end!",
-                    "End of Sheet",
-                    JOptionPane.INFORMATION_MESSAGE);
-            statusLabel.setText("All SKU rows completed.");
+                    "No more SKU rows found. You have reached the end!",
+                    "End of Sheet", JOptionPane.INFORMATION_MESSAGE);
+            setStatus("All SKU rows completed.", Theme.TEXT_SUCCESS);
             nextButton.setVisible(false);
             if (buttonPanel != null) {
                 buttonPanel.revalidate();
@@ -384,80 +451,320 @@ public class QAWindow {
     }
 
     private void onBackClicked() {
-        statusLabel.setText("Loading previous SKU...");
-
-        QAProduct prevProduct = service.loadPreviousProduct();
-        if (prevProduct != null) {
-            displayProduct(prevProduct);
+        setStatus("Loading previous SKU…", Theme.TEXT_MUTED);
+        QAProduct prev = service.loadPreviousProduct();
+        if (prev != null) {
+            displayProduct(prev);
         } else {
             JOptionPane.showMessageDialog(frame,
-                    "You are on the first SKU row. Cannot go further back.",
-                    "First SKU",
+                    "You are already on the first SKU row.", "First SKU",
                     JOptionPane.INFORMATION_MESSAGE);
-            statusLabel.setText("First SKU reached.");
+            setStatus("First SKU reached.", Theme.TEXT_MUTED);
         }
     }
 
     private void handleWindowClosing() {
-        String[] options = {"Save & Exit", "Exit without Saving", "Cancel"};
-        int choice = JOptionPane.showOptionDialog(
-                frame,
-                "You have an active QA review session.\nWould you like to save your progress before exiting?",
-                "Exit Confirmation",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
-        );
-
-        if (choice == 0) {
+        String[] opts = { "Save & Exit", "Exit without Saving", "Cancel" };
+        int choice = JOptionPane.showOptionDialog(frame,
+                "You have an active QA review session.\nWould you like to save before exiting?",
+                "Exit Confirmation", JOptionPane.YES_NO_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE, null, opts, opts[0]);
+        if (choice == 0)
             onSaveAndExitClicked();
-        } else if (choice == 1) {
+        else if (choice == 1) {
             service.close();
             frame.dispose();
             System.exit(0);
         }
-        // choice == 2 or CLOSED_OPTION: Cancel / keep window open
     }
 
     private void onSaveAndExitClicked() {
         if (currentProduct != null) {
             for (CheckpointUI item : checkpointUIList) {
-                String selectedVal = (String) item.dropdown.getSelectedItem();
-                String comment = item.commentField.getText();
-                item.checkpoint.setSelectedValue(selectedVal);
-                item.checkpoint.setComment(comment);
+                item.checkpoint.setSelectedValue((String) item.dropdown.getSelectedItem());
+                item.checkpoint.setComment(item.commentField.getText());
             }
-            if (bugIdField != null) {
+            if (bugIdField != null)
                 currentProduct.setBugIdAndDescription(bugIdField.getText().trim());
-            }
             try {
                 service.saveAndClose(currentProduct);
-                JOptionPane.showMessageDialog(
-                        frame,
-                        "Progress saved for SKU: '" + currentProduct.getSku() + "' (Row " + (currentProduct.getRowIndex() + 1) + ").\nGoodbye!",
-                        "Progress Saved",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
+                JOptionPane.showMessageDialog(frame,
+                        "Progress saved for SKU: '" + currentProduct.getSku()
+                                + "' (Row " + (currentProduct.getRowIndex() + 1) + ").\nGoodbye!",
+                        "Progress Saved", JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException ex) {
                 ex.printStackTrace();
-                int proceed = JOptionPane.showConfirmDialog(
-                        frame,
-                        "Error saving to Excel file:\n" + ex.getMessage() +
-                        "\n\nIf the Excel file is open in Microsoft Excel, please close it.\nDo you still want to exit without saving?",
-                        "Save Failed",
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.ERROR_MESSAGE
-                );
-                if (proceed != JOptionPane.YES_OPTION) {
+                int proceed = JOptionPane.showConfirmDialog(frame,
+                        "Error saving:\n" + ex.getMessage()
+                                + "\n\nClose Excel and try again, or exit without saving?",
+                        "Save Failed", JOptionPane.YES_NO_OPTION, JOptionPane.ERROR_MESSAGE);
+                if (proceed != JOptionPane.YES_OPTION)
                     return;
-                }
             }
         } else {
             service.close();
         }
         frame.dispose();
         System.exit(0);
+    }
+
+    // ── Utility / factory helpers ─────────────────────────────────────────────
+
+    private static JLabel styledLabel(String text, Color fg, float size, boolean bold) {
+        JLabel l = new JLabel(text);
+        l.setFont(bold ? Theme.bold(size) : Theme.plain(size));
+        l.setForeground(fg);
+        return l;
+    }
+
+    private static JLabel colHeader(String text) {
+        JLabel l = styledLabel(text, Theme.TEXT_MUTED, 11, true);
+        l.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 0));
+        return l;
+    }
+
+    private static JTextField styledTextField() {
+        JTextField tf = new JTextField();
+        tf.setFont(Theme.plain(12));
+        tf.setBackground(Theme.FIELD_BG);
+        tf.setForeground(Theme.TEXT_PRIMARY);
+        tf.setCaretColor(Theme.ACCENT);
+        tf.setBorder(BorderFactory.createCompoundBorder(
+                new RoundLineBorder(Theme.BORDER, 1, 6),
+                BorderFactory.createEmptyBorder(3, 6, 3, 6)));
+        tf.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                tf.setBorder(BorderFactory.createCompoundBorder(
+                        new RoundLineBorder(Theme.BORDER_FOCUS, 1, 6),
+                        BorderFactory.createEmptyBorder(3, 6, 3, 6)));
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                tf.setBorder(BorderFactory.createCompoundBorder(
+                        new RoundLineBorder(Theme.BORDER, 1, 6),
+                        BorderFactory.createEmptyBorder(3, 6, 3, 6)));
+            }
+        });
+        return tf;
+    }
+
+    private static JComboBox<String> styledCombo(String[] items) {
+        JComboBox<String> cb = new JComboBox<>(items);
+        cb.setFont(Theme.plain(12));
+        cb.setBackground(Theme.FIELD_BG);
+        cb.setForeground(Theme.TEXT_PRIMARY);
+        cb.setOpaque(true);
+        cb.setMaximumRowCount(14);
+
+        // Custom UI: controls arrow button AND the selected-item paint area so
+        // the background never reverts to white when focus is lost.
+        cb.setUI(new BasicComboBoxUI() {
+            @Override
+            protected JButton createArrowButton() {
+                // Draw a proper down-triangle via Graphics2D (glyph characters render as □ on
+                // some JVMs)
+                JButton btn = new JButton() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        // Fill background
+                        g.setColor(Theme.FIELD_BG);
+                        g.fillRect(0, 0, getWidth(), getHeight());
+                        // Draw solid downward triangle
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setColor(Theme.TEXT_MUTED);
+                        int cx = getWidth() / 2;
+                        int cy = getHeight() / 2;
+                        int[] xs = { cx - 5, cx + 5, cx };
+                        int[] ys = { cy - 3, cy - 3, cy + 3 };
+                        g2.fillPolygon(xs, ys, 3);
+                        g2.dispose();
+                    }
+                };
+                btn.setBackground(Theme.FIELD_BG);
+                btn.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 4));
+                btn.setFocusPainted(false);
+                btn.setContentAreaFilled(false);
+                btn.setOpaque(true);
+                btn.setPreferredSize(new Dimension(22, 0));
+                return btn;
+            }
+
+            @Override
+            public void paintCurrentValueBackground(Graphics g, Rectangle bounds,
+                    boolean hasFocus) {
+                // Always fill with FIELD_BG — never let Metal paint a white background
+                g.setColor(Theme.FIELD_BG);
+                g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+            }
+
+            @Override
+            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
+                // Paint the selected item ourselves to guarantee FIELD_BG background
+                Object selected = comboBox.getSelectedItem();
+                JLabel lbl = new JLabel(selected != null ? selected.toString() : "");
+                lbl.setFont(Theme.plain(12));
+                lbl.setForeground(Theme.TEXT_PRIMARY);
+                lbl.setBackground(Theme.FIELD_BG);
+                lbl.setOpaque(true);
+                lbl.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 0));
+                currentValuePane.paintComponent(g, lbl, comboBox,
+                        bounds.x, bounds.y, bounds.width, bounds.height, false);
+            }
+
+        });
+
+        cb.setBorder(new RoundLineBorder(Theme.BORDER, 1, 6));
+
+        // Style the drop-down popup list
+        cb.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object val,
+                    int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, val, index, isSelected, cellHasFocus);
+                setFont(Theme.plain(12));
+                setForeground(isSelected ? Color.WHITE : Theme.TEXT_PRIMARY);
+                setBackground(isSelected ? Theme.ACCENT_DIM : Theme.FIELD_BG);
+                setOpaque(true);
+                setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+                return this;
+            }
+        });
+
+        return cb;
+    }
+
+    /** Primary accent button. */
+    private static JButton accentButton(String text, Color bg, Color hover) {
+        JButton btn = new JButton(text);
+        btn.setFont(Theme.bold(12));
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(bg);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(true);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(120, 34));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btn.setBackground(hover);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btn.setBackground(bg);
+            }
+        });
+        return btn;
+    }
+
+    /** Secondary ghost button. */
+    private static JButton ghostButton(String text, Color bg, Color hover) {
+        JButton btn = new JButton(text);
+        btn.setFont(Theme.bold(12));
+        btn.setForeground(Theme.TEXT_PRIMARY);
+        btn.setBackground(bg);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(true);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(120, 34));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btn.setBackground(hover);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btn.setBackground(bg);
+            }
+        });
+        return btn;
+    }
+
+    private static Component createSeparator() {
+        JPanel sep = new JPanel();
+        sep.setPreferredSize(new Dimension(1, 1));
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        sep.setBackground(Theme.BORDER);
+        return sep;
+    }
+
+    private void setStatus(String msg, Color color) {
+        statusLabel.setText(msg);
+        statusLabel.setForeground(color);
+    }
+
+    private static String nvl(String s, String fallback) {
+        return (s != null && !s.isEmpty()) ? s : fallback;
+    }
+
+    // ── Custom dark scroll-bar UI ─────────────────────────────────────────────
+    private static class DarkScrollBarUI extends BasicScrollBarUI {
+        @Override
+        protected void configureScrollBarColors() {
+            thumbColor = new Color(60, 72, 110);
+            trackColor = Theme.BG_DARK;
+            thumbDarkShadowColor = Theme.BG_DARK;
+            thumbHighlightColor = Theme.BG_DARK;
+            thumbLightShadowColor = Theme.BG_DARK;
+        }
+
+        @Override
+        protected JButton createDecreaseButton(int o) {
+            return invisibleBtn();
+        }
+
+        @Override
+        protected JButton createIncreaseButton(int o) {
+            return invisibleBtn();
+        }
+
+        private static JButton invisibleBtn() {
+            JButton b = new JButton();
+            b.setPreferredSize(new Dimension(0, 0));
+            b.setMinimumSize(new Dimension(0, 0));
+            b.setMaximumSize(new Dimension(0, 0));
+            return b;
+        }
+    }
+
+    // ── Custom rounded border ─────────────────────────────────────────────────
+    static class RoundLineBorder extends AbstractBorder {
+        private final Color color;
+        private final int thickness;
+        private final int arc;
+
+        RoundLineBorder(Color color, int thickness, int arc) {
+            this.color = color;
+            this.thickness = thickness;
+            this.arc = arc;
+        }
+
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(thickness));
+            g2.drawRoundRect(x + 1, y + 1, w - 2, h - 2, arc, arc);
+            g2.dispose();
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(thickness + 2, thickness + 2, thickness + 2, thickness + 2);
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c, Insets insets) {
+            insets.set(thickness + 2, thickness + 2, thickness + 2, thickness + 2);
+            return insets;
+        }
     }
 }
