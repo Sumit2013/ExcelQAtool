@@ -1,7 +1,12 @@
 target/
+dist/
 .idea/
 .vscode/
 *.class
 *.log
+
+dependency-reduced-pom.xml
+jpackage_log.txt
+dirtest.txt
 
 src/*.xlsx
