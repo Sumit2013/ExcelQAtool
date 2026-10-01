@@ -9,6 +9,7 @@ import com.cyncly.app.model.QAProduct;
 import com.cyncly.app.service.QAservice;
 import com.cyncly.app.service.QAservice.ProgressRecord;
 import com.cyncly.app.ui.FileDropScreen;
+import com.cyncly.app.ui.HomeScreen;
 import com.cyncly.app.ui.QAWindow;
 
 public class App {
@@ -18,9 +19,14 @@ public class App {
         } catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(() -> {
-            FileDropScreen dropScreen = new FileDropScreen(App::startSession);
-            dropScreen.show();
+            HomeScreen homeScreen = new HomeScreen(App::startSession);
+            homeScreen.show();
         });
+    }
+
+    private static void showHome() {
+        HomeScreen homeScreen = new HomeScreen(App::startSession);
+        homeScreen.show();
     }
 
     /**
@@ -56,7 +62,7 @@ public class App {
             }
 
             QAProduct product = service.startSession(filePath, initialRow);
-            QAWindow window = new QAWindow(service, product);
+            QAWindow window = new QAWindow(service, product, App::showHome);
             window.show();
 
         } catch (Exception ex) {
@@ -69,7 +75,8 @@ public class App {
                     JOptionPane.ERROR_MESSAGE
             );
             // Re-open the drop screen so the user can try another file
-            SwingUtilities.invokeLater(() -> new FileDropScreen(App::startSession).show());
+            SwingUtilities.invokeLater(() ->
+                    new FileDropScreen(App::startSession, App::showHome).show());
         }
     }
 }

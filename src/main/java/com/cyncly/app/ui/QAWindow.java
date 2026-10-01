@@ -19,6 +19,7 @@ public class QAWindow {
 
     private final QAservice service;
     private QAProduct currentProduct;
+    private final Runnable onExit;
 
     private JFrame frame;
     private JLabel skuLabel;
@@ -30,6 +31,7 @@ public class QAWindow {
 
     private JPanel checkpointPanel;
     private JTextField bugIdField;
+    private JTextField skuSearchField;
     private JButton doneButton;
     private JButton nextButton;
     private JButton backButton;
@@ -53,12 +55,17 @@ public class QAWindow {
 
     // ── constructors ─────────────────────────────────────────────────────────
     public QAWindow(QAProduct product) {
-        this(new QAservice(), product);
+        this(new QAservice(), product, () -> System.exit(0));
     }
 
     public QAWindow(QAservice service, QAProduct initialProduct) {
+        this(service, initialProduct, () -> System.exit(0));
+    }
+
+    public QAWindow(QAservice service, QAProduct initialProduct, Runnable onExit) {
         this.service = service;
         this.currentProduct = initialProduct;
+        this.onExit = onExit;
     }
 
     // ── public entry point ───────────────────────────────────────────────────
@@ -158,9 +165,50 @@ public class QAWindow {
         left.add(subtitle);
         bar.add(left, BorderLayout.WEST);
 
+        bar.add(createSkuSearchPanel(), BorderLayout.EAST);
+
         // Thin accent separator at the bottom
         bar.add(createSeparator(), BorderLayout.SOUTH);
         return bar;
+    }
+
+    private JPanel createSkuSearchPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        panel.setOpaque(false);
+
+        skuSearchField = styledTextField();
+        skuSearchField.setPreferredSize(new Dimension(170, 30));
+        skuSearchField.addActionListener(e -> onSkuSearch());
+
+        JButton searchButton = ghostButton("Search SKU", Theme.BTN_GHOST, Theme.BTN_GHOST_HV);
+        searchButton.setPreferredSize(new Dimension(100, 30));
+        searchButton.addActionListener(e -> onSkuSearch());
+
+        panel.add(skuSearchField);
+        panel.add(searchButton);
+        return panel;
+    }
+
+    private void onSkuSearch() {
+        String sku = skuSearchField.getText().trim();
+        if (sku.isEmpty()) {
+            setStatus("Enter an SKU to search.", Theme.TEXT_MUTED);
+            return;
+        }
+
+        QAProduct foundProduct = service.searchBySku(sku);
+        if (foundProduct == null) {
+            setStatus("SKU not found: " + sku, Theme.TEXT_ERROR);
+            JOptionPane.showMessageDialog(frame,
+                    "No product was found for SKU:\n" + sku,
+                    "SKU Not Found", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        displayProduct(foundProduct);
+        setStatus("Found SKU: " + foundProduct.getSku()
+                + ". Save it, then use Next to continue.", Theme.TEXT_SUCCESS);
+        skuSearchField.selectAll();
     }
 
     // ── Product header card ───────────────────────────────────────────────────
@@ -473,8 +521,7 @@ public class QAWindow {
             onSaveAndExitClicked();
         else if (choice == 1) {
             service.close();
-            frame.dispose();
-            System.exit(0);
+            returnToPreviousScreen();
         }
     }
 
@@ -504,8 +551,14 @@ public class QAWindow {
         } else {
             service.close();
         }
+        returnToPreviousScreen();
+    }
+
+    private void returnToPreviousScreen() {
         frame.dispose();
-        System.exit(0);
+        if (onExit != null) {
+            SwingUtilities.invokeLater(onExit);
+        }
     }
 
     // ── Utility / factory helpers ─────────────────────────────────────────────

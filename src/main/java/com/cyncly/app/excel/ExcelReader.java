@@ -222,6 +222,23 @@ public class ExcelReader {
         return -1;
     }
 
+    /** Returns the row index whose SKU matches, ignoring case and outer spaces. */
+    public int findRowBySku(String sku) {
+        if (sheet == null || sku == null || sku.trim().isEmpty()) {
+            return -1;
+        }
+
+        String targetSku = sku.trim();
+        int lastRow = sheet.getLastRowNum();
+        for (int rowIndex = 2; rowIndex <= lastRow; rowIndex++) {
+            XSSFRow row = sheet.getRow(rowIndex);
+            if (row != null && getCellValue(row, 5).equalsIgnoreCase(targetSku)) {
+                return rowIndex;
+            }
+        }
+        return -1;
+    }
+
     public QAProduct readExcel(String filePath) throws IOException {
         loadWorkbook(filePath);
         int firstRow = findNextProductRow(2);

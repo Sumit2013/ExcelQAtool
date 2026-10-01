@@ -89,6 +89,21 @@ public class QAservice {
         return this.currentProduct;
     }
 
+    /** Loads a matching SKU and makes it the current position for navigation. */
+    public QAProduct searchBySku(String sku) {
+        int row = reader.findRowBySku(sku);
+        if (row == -1) {
+            return null;
+        }
+
+        this.currentRowIndex = row;
+        this.currentProduct = reader.readProductAtRow(row);
+        if (this.currentProduct != null) {
+            saveProgressRecord(row, this.currentProduct.getSku());
+        }
+        return this.currentProduct;
+    }
+
     public boolean hasPreviousProduct() {
         return reader.findPreviousProductRow(currentRowIndex - 1) != -1;
     }

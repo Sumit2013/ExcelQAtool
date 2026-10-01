@@ -18,10 +18,17 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 public class FileDropScreen {
 
     private JFrame frame;
+    private JPanel rootPanel;
     private final Consumer<File> onFileChosen;
+    private final Runnable onBack;
 
     public FileDropScreen(Consumer<File> onFileChosen) {
+        this(onFileChosen, null);
+    }
+
+    public FileDropScreen(Consumer<File> onFileChosen, Runnable onBack) {
         this.onFileChosen = onFileChosen;
+        this.onBack = onBack;
     }
 
     /** Build and display the welcome window. */
@@ -33,7 +40,15 @@ public class FileDropScreen {
         frame.setLocationRelativeTo(null);
         frame.setResizable(true);
 
+        frame.setContentPane(createPanel());
+        frame.setVisible(true);
+    }
+
+    /** Builds the file selector so it can be embedded in another screen. */
+    public JPanel createPanel() {
+
         JPanel root = new JPanel(new GridBagLayout());
+        rootPanel = root;
         root.setBackground(Theme.BG_DARK);
         root.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
 
@@ -81,8 +96,24 @@ public class FileDropScreen {
         gbc.insets = new Insets(0, 60, 0, 60);
         root.add(browseBtn, gbc);
 
-        frame.setContentPane(root);
-        frame.setVisible(true);
+        if (onBack != null) {
+            JButton backButton = new JButton("← Back to Home");
+            backButton.setFont(Theme.plain(12));
+            backButton.setForeground(Theme.PURPLE_DIM);
+            backButton.setBackground(Theme.SEA_SHELL);
+            backButton.setBorderPainted(false);
+            backButton.setFocusPainted(false);
+            backButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            backButton.addActionListener(e -> {
+                if (frame != null) frame.dispose();
+                onBack.run();
+            });
+            gbc.gridy = 5;
+            gbc.insets = new Insets(12, 0, 0, 0);
+            root.add(backButton, gbc);
+        }
+
+        return root;
     }
 
     // ── Drop Zone panel ───────────────────────────────────────────────────────
@@ -131,7 +162,7 @@ public class FileDropScreen {
                     if (e.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
                         hovering = true;
                         setBorder(new DashedRoundBorder(Theme.BORDER_FOCUS, 3, 14));
-                        setBackground(new Color(30, 45, 70));
+                        setBackground(new Color(245, 240, 255));
                         repaint();
                     }
                 }
@@ -172,7 +203,7 @@ public class FileDropScreen {
             addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) { openFileChooser(); }
                 @Override public void mouseEntered(MouseEvent e) {
-                    if (!hovering) { setBackground(new Color(30, 37, 60)); repaint(); }
+                    if (!hovering) { setBackground(new Color(252, 247, 255)); repaint(); }
                 }
                 @Override public void mouseExited(MouseEvent e) {
                     if (!hovering) { setBackground(Theme.CARD_BG); repaint(); }
@@ -206,7 +237,8 @@ public class FileDropScreen {
         chooser.setDialogTitle("Select QA Excel File");
         chooser.setFileFilter(new FileNameExtensionFilter("Excel Files (*.xlsx, *.xls)", "xlsx", "xls"));
         chooser.setAcceptAllFileFilterUsed(false);
-        if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+        Component parent = frame != null ? frame : rootPanel;
+        if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
             File chosen = chooser.getSelectedFile();
             if (isExcelFile(chosen)) acceptFile(chosen);
             else showError("Selected file is not an Excel file (.xlsx or .xls).");
@@ -214,7 +246,7 @@ public class FileDropScreen {
     }
 
     private void acceptFile(File file) {
-        frame.dispose();
+        if (frame != null) frame.dispose();
         onFileChosen.accept(file);
     }
 
@@ -225,7 +257,8 @@ public class FileDropScreen {
     }
 
     private void showError(String message) {
-        JOptionPane.showMessageDialog(frame, message, "Invalid File", JOptionPane.ERROR_MESSAGE);
+        Component parent = frame != null ? frame : rootPanel;
+        JOptionPane.showMessageDialog(parent, message, "Invalid File", JOptionPane.ERROR_MESSAGE);
     }
 
     // ── Dashed rounded border ─────────────────────────────────────────────────

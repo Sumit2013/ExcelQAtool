@@ -11,30 +11,36 @@ public final class Theme {
 
     private Theme() {}
 
+    // ── Purple / seashell design palette ─────────────────────────────────────
+    public static final Color PURPLE      = new Color(106, 93, 222);  // #6A5DDE
+    public static final Color PURPLE_HV   = new Color(124, 110, 230);
+    public static final Color PURPLE_DIM  = new Color(83, 72, 180);
+    public static final Color SEA_SHELL   = new Color(255, 244, 236); // #FFF4EC
+
     // ── Background layers ────────────────────────────────────────────────────
-    public static final Color BG_DARK      = new Color(18,  22,  36);
-    public static final Color CARD_BG      = new Color(26,  31,  50);
-    public static final Color FIELD_BG     = new Color(34,  41,  64);
-    public static final Color ROW_ALT      = new Color(22,  27,  44);   // alternating row tint
+    public static final Color BG_DARK      = SEA_SHELL;
+    public static final Color CARD_BG      = Color.WHITE;
+    public static final Color FIELD_BG     = new Color(255, 250, 247);
+    public static final Color ROW_ALT      = new Color(252, 247, 243);
 
     // ── Borders ───────────────────────────────────────────────────────────────
-    public static final Color BORDER       = new Color(50,  62,  100);
-    public static final Color BORDER_FOCUS = new Color(99, 179, 237);
+    public static final Color BORDER       = new Color(228, 220, 236);
+    public static final Color BORDER_FOCUS = PURPLE;
 
-    // ── Accent (blue) ─────────────────────────────────────────────────────────
-    public static final Color ACCENT       = new Color(99,  179, 237);
-    public static final Color ACCENT_HOVER = new Color(144, 205, 244);
-    public static final Color ACCENT_DIM   = new Color(60,  110, 160);
+    // ── Accent ────────────────────────────────────────────────────────────────
+    public static final Color ACCENT       = PURPLE;
+    public static final Color ACCENT_HOVER = PURPLE_HV;
+    public static final Color ACCENT_DIM   = PURPLE_DIM;
 
     // ── Secondary button (ghost) ──────────────────────────────────────────────
-    public static final Color BTN_GHOST    = new Color(40,  50,  80);
-    public static final Color BTN_GHOST_HV = new Color(55,  68, 108);
+    public static final Color BTN_GHOST    = Color.WHITE;
+    public static final Color BTN_GHOST_HV = new Color(246, 240, 252);
 
     // ── Text ──────────────────────────────────────────────────────────────────
-    public static final Color TEXT_PRIMARY = new Color(230, 235, 255);
-    public static final Color TEXT_MUTED   = new Color(130, 140, 170);
-    public static final Color TEXT_SUCCESS = new Color(100, 220, 140);
-    public static final Color TEXT_ERROR   = new Color(255, 110, 110);
+    public static final Color TEXT_PRIMARY = new Color(45, 35, 64);
+    public static final Color TEXT_MUTED   = new Color(117, 106, 133);
+    public static final Color TEXT_SUCCESS = new Color(38, 138, 91);
+    public static final Color TEXT_ERROR   = new Color(201, 76, 76);
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
     public static final String FONT_FAMILY = "Segoe UI";
